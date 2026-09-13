@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+numpy
+opencv-python-headless
+Pillow
+torch
+torchvision
+grad-cam
+scikit-learn
+SQLAlchemy
+reportlab
+webauthn
