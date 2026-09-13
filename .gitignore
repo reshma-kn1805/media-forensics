@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Frontend build
+frontend/dist/
+frontend/build/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python environment/config
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# ML generated/cache files
+__pycache__/
+*.pt.tmp
+*.pth.tmp
+
+# Temporary files
+*.tmp
+*.temp
+
+# VERITAS generated forensic reports
+backend/reports/
+backend/data/reports/
+
+# Local databases
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+
+# Uploaded/generated local test data
+data/raw/
+data/processed/
+data/test/

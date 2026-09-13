@@ -1,0 +1,118 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+
+  color: #e8eef7;
+  background: #070b12;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: #070b12;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(
+      circle at 15% 10%,
+      rgba(0, 210, 190, 0.045),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 85% 15%,
+      rgba(100, 80, 255, 0.04),
+      transparent 25%
+    ),
+    #070b12;
+  color: #e8eef7;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+::selection {
+  background: rgba(0, 220, 200, 0.2);
+  color: #ffffff;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080d15;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #263343;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #344457;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(0, 220, 200, 0.8);
+  outline-offset: 2px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #647184;
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
