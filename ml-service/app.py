@@ -18,7 +18,7 @@ from utils.gradcam import generate_gradcam_base64
 from backend.services.forensics import run_forensics
 from backend.services.report_generator import generate_forensic_report
 
-from backend.database import SessionLocal
+from backend.database import SessionLocal, create_database
 from backend.models.analysis import Analysis
 
 from backend.routes.auth import router as auth_router
@@ -35,6 +35,18 @@ app = FastAPI(
     description="AI-powered media forensic analysis service.",
     version="1.0.0",
 )
+# ============================================================
+# DATABASE STARTUP
+# ============================================================
+
+@app.on_event("startup")
+def initialize_database():
+    """
+    Create all required database tables when the
+    VERITAS backend starts.
+    """
+    create_database()
+    print("VERITAS database initialized successfully.")
 
 
 # ============================================================
@@ -48,6 +60,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "https://veritas-frontend-0xoi.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
