@@ -35,6 +35,8 @@ app = FastAPI(
     description="AI-powered media forensic analysis service.",
     version="1.0.0",
 )
+
+
 # ============================================================
 # DATABASE STARTUP
 # ============================================================
@@ -284,8 +286,21 @@ def normalize_face_box(
     width = int(face[2])
     height = int(face[3])
 
-    x = max(0, min(x, image_width - 1))
-    y = max(0, min(y, image_height - 1))
+    x = max(
+        0,
+        min(
+            x,
+            image_width - 1,
+        ),
+    )
+
+    y = max(
+        0,
+        min(
+            y,
+            image_height - 1,
+        ),
+    )
 
     right = max(
         x + 1,
@@ -505,15 +520,14 @@ def analyze_single_face(
     face_index: int,
 ):
     """
-    Run the complete AI analysis pipeline for one detected face.
+    Run EfficientNet prediction for one detected face.
 
-    Returns:
-        bounding box
-        prediction
-        confidence
-        real probability
-        fake probability
-        Grad-CAM
+    IMPORTANT PERFORMANCE OPTIMIZATION:
+    Grad-CAM is NOT generated here.
+
+    All detected faces receive normal model prediction.
+    Grad-CAM is generated only once later for the
+    selected/highest-risk face.
     """
 
     image_height, image_width = (
@@ -568,45 +582,6 @@ def analyze_single_face(
         input_tensor
     )
 
-    heatmap_base64 = None
-
-    explainability_status = "disabled"
-
-    if GENERATE_GRADCAM:
-
-        try:
-
-            predicted_class_index = (
-                class_names.index(
-                    prediction
-                )
-            )
-
-            heatmap_base64 = (
-                generate_gradcam_base64(
-                    model=model,
-                    input_tensor=input_tensor,
-                    face_image=face_pil,
-                    target_class=(
-                        predicted_class_index
-                    ),
-                )
-            )
-
-            explainability_status = (
-                "generated"
-            )
-
-        except Exception as error:
-
-            explainability_status = "error"
-
-            print(
-                f"Grad-CAM warning for face "
-                f"{face_index}:",
-                error,
-            )
-
     return {
         "face_index": int(face_index),
 
@@ -635,10 +610,130 @@ def analyze_single_face(
 
         "explainability": {
             "method": "Grad-CAM",
-            "status": explainability_status,
-            "heatmap_base64": heatmap_base64,
+            "status": "pending",
+            "heatmap_base64": None,
         },
     }
+
+
+# ============================================================
+# GENERATE GRAD-CAM FOR SELECTED FACE ONLY
+# ============================================================
+
+def generate_selected_face_gradcam(
+    image: np.ndarray,
+    selected_face_result: dict,
+):
+    """
+    Generate Grad-CAM only for the selected face.
+
+    This is intentionally performed once per image
+    rather than once for every detected face.
+
+    This significantly reduces CPU and memory usage
+    on constrained deployment environments such as Render.
+    """
+
+    if not GENERATE_GRADCAM:
+        selected_face_result[
+            "explainability"
+        ]["status"] = "disabled"
+
+        return selected_face_result
+
+    bounding_box = selected_face_result[
+        "bounding_box"
+    ]
+
+    x = int(
+        bounding_box["x"]
+    )
+
+    y = int(
+        bounding_box["y"]
+    )
+
+    width = int(
+        bounding_box["width"]
+    )
+
+    height = int(
+        bounding_box["height"]
+    )
+
+    face_crop = image[
+        y:y + height,
+        x:x + width,
+    ]
+
+    if face_crop.size == 0:
+
+        selected_face_result[
+            "explainability"
+        ]["status"] = "error"
+
+        return selected_face_result
+
+    face_rgb = cv2.cvtColor(
+        face_crop,
+        cv2.COLOR_BGR2RGB,
+    )
+
+    face_pil = Image.fromarray(
+        face_rgb
+    )
+
+    input_tensor = preprocess_image(
+        face_pil
+    )
+
+    input_tensor = input_tensor.to(
+        device
+    )
+
+    prediction = selected_face_result[
+        "prediction"
+    ]
+
+    target_class = class_names.index(
+        prediction
+    )
+
+    try:
+
+        heatmap_base64 = (
+            generate_gradcam_base64(
+                model=model,
+                input_tensor=input_tensor,
+                face_image=face_pil,
+                target_class=target_class,
+            )
+        )
+
+        selected_face_result[
+            "explainability"
+        ] = {
+            "method": "Grad-CAM",
+            "status": "generated",
+            "heatmap_base64": heatmap_base64,
+        }
+
+    except Exception as error:
+
+        print(
+            "Selected-face Grad-CAM warning:",
+            error,
+        )
+
+        selected_face_result[
+            "explainability"
+        ] = {
+            "method": "Grad-CAM",
+            "status": "error",
+            "heatmap_base64": None,
+        }
+
+    return selected_face_result
 
 
 # ============================================================
@@ -768,7 +863,9 @@ def save_analysis_to_database(
                 "Analysis performed using the "
                 "trained VERITAS EfficientNet-B0 "
                 "model with multi-face analysis "
-                "and supporting forensic indicators."
+                "and supporting forensic indicators. "
+                "Grad-CAM generated only for the "
+                "selected highest-risk face."
             ),
         )
 
@@ -797,6 +894,9 @@ def root():
         "model": "EfficientNet-B0",
         "trained_for_deepfake_detection": True,
         "gradcam_enabled": GENERATE_GRADCAM,
+        "gradcam_strategy": (
+            "Selected face only"
+        ),
         "multi_face_analysis": True,
         "forensic_modules": {
             "metadata": True,
@@ -857,6 +957,10 @@ def health():
 
         "gradcam_target_layer": (
             "EfficientNet-B0 features[-1]"
+        ),
+
+        "gradcam_strategy": (
+            "Selected highest-risk face only"
         ),
     }
 
@@ -1109,6 +1213,38 @@ async def analyze_media(
         face_results
     )
 
+    # --------------------------------------------------------
+    # 9. GENERATE GRAD-CAM ONLY FOR SELECTED FACE
+    # --------------------------------------------------------
+
+    selected_face_result = (
+        generate_selected_face_gradcam(
+            image=image,
+            selected_face_result=(
+                selected_face_result
+            ),
+        )
+    )
+
+    # Update the selected face inside the
+    # original face_results list so the frontend
+    # receives the generated heatmap there too.
+
+    for index, face_result in enumerate(
+        face_results
+    ):
+
+        if (
+            face_result["face_index"]
+            == selected_face_result["face_index"]
+        ):
+
+            face_results[index] = (
+                selected_face_result
+            )
+
+            break
+
     selected_face = (
         selected_face_result[
             "bounding_box"
@@ -1128,7 +1264,7 @@ async def analyze_media(
     )
 
     # --------------------------------------------------------
-    # 9. PROCESSING TIME
+    # 10. PROCESSING TIME
     # --------------------------------------------------------
 
     processing_time_ms = (
@@ -1137,7 +1273,7 @@ async def analyze_media(
     ) * 1000
 
     # --------------------------------------------------------
-    # 10. BUILD ANALYSIS RESULT
+    # 11. BUILD ANALYSIS RESULT
     # --------------------------------------------------------
 
     analysis_result = {
@@ -1235,7 +1371,7 @@ async def analyze_media(
     }
 
     # --------------------------------------------------------
-    # 11. SAVE DATABASE RECORD
+    # 12. SAVE DATABASE RECORD
     # --------------------------------------------------------
 
     try:
@@ -1302,7 +1438,7 @@ async def analyze_media(
     )
 
     # --------------------------------------------------------
-    # 12. GENERATE PDF REPORT
+    # 13. GENERATE PDF REPORT
     # --------------------------------------------------------
 
     report_available = False
@@ -1338,7 +1474,7 @@ async def analyze_media(
         report_error = str(error)
 
     # --------------------------------------------------------
-    # 13. FINAL RESPONSE
+    # 14. FINAL RESPONSE
     # --------------------------------------------------------
 
     response = {
