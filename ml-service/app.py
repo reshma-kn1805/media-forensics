@@ -93,7 +93,26 @@ ALLOWED_CONTENT_TYPES = {
     "image/webp",
 }
 
-GENERATE_GRADCAM = True
+# ------------------------------------------------------------
+# DEPLOYMENT SAFETY
+# ------------------------------------------------------------
+#
+# Render provides a very limited memory environment.
+# Grad-CAM requires considerably more memory than normal
+# EfficientNet inference because it must retain intermediate
+# activations and gradients.
+#
+# The trained model and all normal forensic analysis remain
+# fully enabled.
+#
+# Grad-CAM is temporarily disabled during the main analysis
+# request so that the Render service cannot be terminated by
+# memory exhaustion.
+#
+# We will re-enable a lightweight explainability workflow
+# after the core /analyze endpoint is stable.
+#
+GENERATE_GRADCAM = False
 
 
 # ============================================================
