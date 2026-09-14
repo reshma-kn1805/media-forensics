@@ -182,7 +182,7 @@ type ModuleInfo = {
   icon: string;
 };
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://veritas-api-nsqf.onrender.com";
 
 /*
  * STEP 4 — TEMPORARY LOCAL AUTHENTICATION

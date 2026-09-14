@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://veritas-api-nsqf.onrender.com";
 
 
 function base64urlToUint8Array(base64url: string): Uint8Array {
