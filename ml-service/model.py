@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
+from torchvision.models import efficientnet_b0
 
 
 class DeepfakeClassifier(nn.Module):
@@ -15,9 +15,12 @@ class DeepfakeClassifier(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # Load EfficientNet-B0 with ImageNet pretrained weights
-        weights = EfficientNet_B0_Weights.DEFAULT
-        self.backbone = efficientnet_b0(weights=weights)
+        # Create EfficientNet-B0 architecture WITHOUT downloading
+        # ImageNet pretrained weights.
+        #
+        # The trained VERITAS checkpoint provides the actual weights
+        # during inference.
+        self.backbone = efficientnet_b0(weights=None)
 
         # Get the number of features from the original classifier
         in_features = self.backbone.classifier[1].in_features
@@ -37,12 +40,15 @@ class DeepfakeClassifier(nn.Module):
     def target_layer(self):
         """
         Returns the final convolutional layer.
-        This layer can later be used for Grad-CAM explainability.
+        This layer is used for Grad-CAM explainability.
         """
         return self.backbone.features[-1]
 
 
-# Class names used by the model
+# Default class names.
+#
+# The actual class mapping used during inference is read from
+# the trained checkpoint by ml-service/app.py.
 CLASS_NAMES = ["real", "fake"]
 
 
@@ -58,21 +64,30 @@ IMAGENET_STD = [0.229, 0.224, 0.225]
 def create_model():
     """
     Create and return a DeepfakeClassifier.
+
+    No external model weights are downloaded here.
+    The trained VERITAS checkpoint is loaded separately.
     """
     return DeepfakeClassifier()
 
 
 if __name__ == "__main__":
-    # Simple test
+    # Simple local architecture test
     model = create_model()
 
     # Create a dummy image
-    test_image = torch.randn(1, 3, IMAGE_SIZE, IMAGE_SIZE)
+    test_image = torch.randn(
+        1,
+        3,
+        IMAGE_SIZE,
+        IMAGE_SIZE
+    )
 
     # Run the image through the model
     output = model(test_image)
 
-    print("Model created successfully!")
+    print("Model architecture created successfully!")
     print("Input shape:", test_image.shape)
     print("Output shape:", output.shape)
     print("Class names:", CLASS_NAMES)
+    print("Pretrained download required: No")
