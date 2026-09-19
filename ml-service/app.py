@@ -112,7 +112,7 @@ ALLOWED_CONTENT_TYPES = {
 # We will re-enable a lightweight explainability workflow
 # after the core /analyze endpoint is stable.
 #
-GENERATE_GRADCAM = False
+GENERATE_GRADCAM = True
 
 
 # ============================================================
