@@ -902,7 +902,7 @@ def save_analysis_to_database(
 # ROOT
 # ============================================================
 
-@app.get("/")
+@app.get("/api/status")
 def root():
 
     return {
