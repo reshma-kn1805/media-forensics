@@ -24,9 +24,7 @@ DATABASE_DIR.mkdir(
 
 DATABASE_PATH = DATABASE_DIR / "media_forensics.db"
 
-DATABASE_URL = (
-    f"sqlite:///{DATABASE_PATH}"
-)
+DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 
 # ============================================================
@@ -86,11 +84,18 @@ def get_db():
 
 def create_database():
     """
-    Import all database models so SQLAlchemy knows
-    which tables need to be created.
+    Create all VERITAS database tables.
+
+    This is safe to call every time the application starts.
+    Existing tables are not deleted.
     """
 
-    from backend.models.analysis import Analysis, PasskeyCredential
+    # Import models here so SQLAlchemy knows about them
+    # before create_all() is executed.
+    from backend.models.analysis import (
+        Analysis,
+        PasskeyCredential,
+    )
 
     Base.metadata.create_all(
         bind=engine
@@ -112,7 +117,4 @@ if __name__ == "__main__":
 
     print()
     print("Database location:")
-
-    print(
-        DATABASE_PATH
-    )
+    print(DATABASE_PATH)
