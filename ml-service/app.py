@@ -1614,3 +1614,59 @@ async def analyze_media(
     return make_json_safe(
         response
     )
+# ============================================================
+# SINGLE-DEPLOYMENT FRONTEND
+# ============================================================
+
+from fastapi.responses import FileResponse
+from fastapi import Request
+
+
+FRONTEND_DIR = Path("/app/frontend/dist")
+FRONTEND_INDEX = FRONTEND_DIR / "index.html"
+
+
+@app.get("/", include_in_schema=False)
+def serve_frontend():
+    """
+    Serve the React frontend from the same FastAPI application.
+    """
+    if not FRONTEND_INDEX.exists():
+        raise HTTPException(
+            status_code=503,
+            detail="Frontend build not found.",
+        )
+
+    return FileResponse(
+        FRONTEND_INDEX
+    )
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_frontend_routes(
+    full_path: str,
+    request: Request,
+):
+    """
+    Serve React static files and support SPA routes.
+
+    API routes defined above are matched first.
+    Unknown frontend routes fall back to index.html.
+    """
+
+    requested_file = FRONTEND_DIR / full_path
+
+    if requested_file.is_file():
+        return FileResponse(
+            requested_file
+        )
+
+    if FRONTEND_INDEX.exists():
+        return FileResponse(
+            FRONTEND_INDEX
+        )
+
+    raise HTTPException(
+        status_code=404,
+        detail="Frontend resource not found.",
+    )
