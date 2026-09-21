@@ -1,6 +1,7 @@
 from pathlib import Path
 import io
 import time
+import threading
 
 import cv2
 import numpy as np
@@ -159,6 +160,12 @@ else:
 
 model.to(device)
 model.eval()
+
+# ============================================================
+# ANALYSIS CONCURRENCY CONTROL
+# ============================================================
+
+analysis_lock = threading.Lock()
 
 
 # ============================================================
@@ -1167,120 +1174,127 @@ async def analyze_media(
             ),
         )
 
-    # --------------------------------------------------------
+        # --------------------------------------------------------
     # 7. ANALYZE EVERY DETECTED FACE
     # --------------------------------------------------------
+    #
+    # The EfficientNet model and Grad-CAM are CPU-intensive.
+    # Only one request performs these heavy operations at a
+    # time so simultaneous browser uploads do not compete
+    # for the Railway CPU allocation.
+    #
+    with analysis_lock:
 
-    face_results = []
+        face_results = []
 
-    face_analysis_errors = []
+        face_analysis_errors = []
 
-    for face_index, face in enumerate(
-        faces,
-        start=1,
-    ):
-
-        try:
-
-            result = analyze_single_face(
-                image=image,
-                face=face,
-                face_index=face_index,
-            )
-
-            face_results.append(
-                result
-            )
-
-        except Exception as error:
-
-            print(
-                f"Face {face_index} analysis error:",
-                error,
-            )
-
-            face_analysis_errors.append(
-                {
-                    "face_index": int(
-                        face_index
-                    ),
-                    "error": str(error),
-                }
-            )
-
-    if not face_results:
-
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Faces were detected, but none "
-                "could be analyzed successfully."
-            ),
-        )
-
-    # --------------------------------------------------------
-    # 8. OVERALL VERDICT
-    # --------------------------------------------------------
-
-    (
-        prediction,
-        confidence,
-        real_probability,
-        fake_probability,
-        selected_face_result,
-    ) = calculate_overall_face_verdict(
-        face_results
-    )
-
-    # --------------------------------------------------------
-    # 9. GENERATE GRAD-CAM ONLY FOR SELECTED FACE
-    # --------------------------------------------------------
-
-    selected_face_result = (
-        generate_selected_face_gradcam(
-            image=image,
-            selected_face_result=(
-                selected_face_result
-            ),
-        )
-    )
-
-    # Update the selected face inside the
-    # original face_results list so the frontend
-    # receives the generated heatmap there too.
-
-    for index, face_result in enumerate(
-        face_results
-    ):
-
-        if (
-            face_result["face_index"]
-            == selected_face_result["face_index"]
+        for face_index, face in enumerate(
+            faces,
+            start=1,
         ):
 
-            face_results[index] = (
-                selected_face_result
+            try:
+
+                result = analyze_single_face(
+                    image=image,
+                    face=face,
+                    face_index=face_index,
+                )
+
+                face_results.append(
+                    result
+                )
+
+            except Exception as error:
+
+                print(
+                    f"Face {face_index} analysis error:",
+                    error,
+                )
+
+                face_analysis_errors.append(
+                    {
+                        "face_index": int(
+                            face_index
+                        ),
+                        "error": str(error),
+                    }
+                )
+
+        if not face_results:
+
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Faces were detected, but none "
+                    "could be analyzed successfully."
+                ),
             )
 
-            break
+        # ----------------------------------------------------
+        # 8. OVERALL VERDICT
+        # ----------------------------------------------------
 
-    selected_face = (
-        selected_face_result[
-            "bounding_box"
-        ]
-    )
+        (
+            prediction,
+            confidence,
+            real_probability,
+            fake_probability,
+            selected_face_result,
+        ) = calculate_overall_face_verdict(
+            face_results
+        )
 
-    explainability_status = (
-        selected_face_result[
-            "explainability"
-        ]["status"]
-    )
+        # ----------------------------------------------------
+        # 9. GENERATE GRAD-CAM ONLY FOR SELECTED FACE
+        # ----------------------------------------------------
 
-    heatmap_base64 = (
-        selected_face_result[
-            "explainability"
-        ]["heatmap_base64"]
-    )
+        selected_face_result = (
+            generate_selected_face_gradcam(
+                image=image,
+                selected_face_result=(
+                    selected_face_result
+                ),
+            )
+        )
+
+        # Update the selected face inside the
+        # original face_results list so the frontend
+        # receives the generated heatmap there too.
+
+        for index, face_result in enumerate(
+            face_results
+        ):
+
+            if (
+                face_result["face_index"]
+                == selected_face_result["face_index"]
+            ):
+
+                face_results[index] = (
+                    selected_face_result
+                )
+
+                break
+
+        selected_face = (
+            selected_face_result[
+                "bounding_box"
+            ]
+        )
+
+        explainability_status = (
+            selected_face_result[
+                "explainability"
+            ]["status"]
+        )
+
+        heatmap_base64 = (
+            selected_face_result[
+                "explainability"
+            ]["heatmap_base64"]
+        )
 
     # --------------------------------------------------------
     # 10. PROCESSING TIME
@@ -1622,7 +1636,7 @@ from fastapi.responses import FileResponse
 from fastapi import Request
 
 
-FRONTEND_DIR = Path("/app/frontend/dist")
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 FRONTEND_INDEX = FRONTEND_DIR / "index.html"
 
 
